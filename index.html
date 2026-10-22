@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Analizzatore metrico</title>
+<meta name="description" content="Analizza endecasillabi: ictus, sillabe, sinalefi, tipo di verso. Funziona tutto nel browser.">
+<style>
+:root {
+  --bg: #f6f1e7; --card: #fffdf8; --ink: #2b2620; --muted: #7a7064; --line: #e3dac8;
+  --accent: #b4492d; --accent-bg: #f6dfd6; --good: #2f6b4a; --good-bg: #dcecdf;
+  --key: #1b5fb0; --key-bg: #dce8f7; --sub: #7b3fa0; --sub-bg: #eadcf3;
+  --bad: #a3322a; --bad-bg: #f6dcd8; --warn: #8a6410; --warn-bg: #f4e8c4; --chip: #ece4d3;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1a1713; --card: #231f1a; --ink: #eee6d8; --muted: #a39887; --line: #38312a;
+    --accent: #f08a68; --accent-bg: #4a2a20; --good: #8fd0a6; --good-bg: #1f3a2b;
+    --key: #7db4f0; --key-bg: #1c2f48; --sub: #c79af0; --sub-bg: #35264a;
+    --bad: #f0928a; --bad-bg: #44211e; --warn: #e6c36a; --warn-bg: #3d3216; --chip: #2e2820;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #1a1713; --card: #231f1a; --ink: #eee6d8; --muted: #a39887; --line: #38312a;
+  --accent: #f08a68; --accent-bg: #4a2a20; --good: #8fd0a6; --good-bg: #1f3a2b;
+  --key: #7db4f0; --key-bg: #1c2f48; --sub: #c79af0; --sub-bg: #35264a;
+  --bad: #f0928a; --bad-bg: #44211e; --warn: #e6c36a; --warn-bg: #3d3216; --chip: #2e2820;
+}
+* { box-sizing: border-box; }
+html { background: var(--bg); }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.5 Georgia, "Iowan Old Style", "Times New Roman", serif; }
+main { max-width: 900px; margin: 0 auto; padding: 32px 16px 64px; }
+header h1 { font-size: 1.9rem; margin: 0 0 4px; letter-spacing: .01em; }
+header p { margin: 0 0 20px; color: var(--muted); }
+textarea { width: 100%; min-height: 190px; padding: 14px 16px; font: inherit; color: var(--ink); background: var(--card);
+  border: 1px solid var(--line); border-radius: 10px; resize: vertical; line-height: 1.6; }
+textarea:focus, button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 12px 0 8px; }
+button, select { font: 15px/1 system-ui, sans-serif; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--card); color: var(--ink); cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; padding: 11px 20px; }
+:root[data-theme="dark"] button.primary { color: #1a1713; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) button.primary { color: #1a1713; } }
+button:disabled { opacity: .55; cursor: wait; }
+.spacer { flex: 1; }
+label.opt { font: 14px system-ui, sans-serif; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+#status { font: 14px system-ui, sans-serif; color: var(--muted); min-height: 1.4em; }
+details.help { margin: 14px 0 6px; font: 15px/1.55 system-ui, sans-serif; color: var(--muted); }
+details.help summary { cursor: pointer; color: var(--ink); }
+details.help ul { margin: 8px 0 0; padding-left: 20px; }
+details.help b { color: var(--ink); }
+#summary { margin: 26px 0 14px; padding: 12px 16px; border-radius: 10px; background: var(--chip); font: 15px/1.5 system-ui, sans-serif; }
+#results { display: grid; gap: 10px; }
+.stanza { height: 14px; }
+.verse { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px 12px 14px;
+  display: grid; grid-template-columns: 34px 1fr; gap: 6px 10px; }
+.verse .n { font: 13px ui-monospace, Menlo, monospace; color: var(--muted); padding-top: 24px; text-align: right; }
+.grid { display: flex; flex-wrap: wrap; gap: 2px 3px; }
+.col { display: flex; flex-direction: column; align-items: center; min-width: 26px; }
+.col .sede { font: 11px ui-monospace, Menlo, monospace; color: var(--muted); }
+.col .sede.required { color: var(--key); background: var(--key-bg); font-weight: 700; border-radius: 4px; padding: 0 5px; font-size: 12.5px; }
+.col .sede.kind { color: var(--sub); background: var(--sub-bg); font-weight: 700; border-radius: 4px; padding: 0 5px; font-size: 12.5px; }
+.col .syl { padding: 1px 5px; border-radius: 6px; font-size: 1.12rem; white-space: nowrap; }
+.col.st .syl { background: var(--accent-bg); color: var(--accent); font-weight: 700; }
+.col .mark { font-size: 10px; height: 12px; color: var(--accent); }
+.meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 4px; font: 13.5px/1.3 system-ui, sans-serif; }
+.chip { padding: 4px 10px; border-radius: 999px; background: var(--chip); color: var(--muted); }
+.chip.good { background: var(--good-bg); color: var(--good); font-weight: 600; }
+.chip.bad { background: var(--bad-bg); color: var(--bad); font-weight: 600; }
+.chip.warn { background: var(--warn-bg); color: var(--warn); }
+button.chip { border: 0; cursor: pointer; padding: 4px 10px; font: inherit; background: var(--warn-bg); color: var(--warn); }
+.msg { grid-column: 2; font: 14px/1.5 system-ui, sans-serif; color: var(--bad); }
+.syls { grid-column: 2; font: 15px/1.5 ui-monospace, Menlo, monospace; color: var(--muted); }
+.alt { grid-column: 2; padding: 10px 12px; border-left: 3px solid var(--warn); background: var(--chip); border-radius: 0 8px 8px 0; }
+.alt[hidden] { display: none; }
+.steps { grid-column: 2; padding: 10px 14px; border-left: 3px solid var(--key); background: var(--chip); border-radius: 0 8px 8px 0;
+  font: 14px/1.5 system-ui, sans-serif; }
+.steps[hidden] { display: none; }
+.steps h4 { margin: 0 0 6px; font-size: 13px; color: var(--key); }
+.steps ol { margin: 0; padding-left: 20px; }
+.steps li { margin-bottom: 8px; }
+.steps li > b { display: block; margin-bottom: 2px; }
+.steps ul { margin: 0; padding-left: 18px; color: var(--muted); }
+.steps ul li { margin: 0 0 2px; }
+button.chip.didactic { background: var(--key-bg); color: var(--key); }
+dl.glossary { margin: 8px 0 0; }
+dl.glossary h4 { margin: 14px 0 4px; color: var(--ink); }
+dl.glossary dt { font-weight: 700; color: var(--ink); margin-top: 6px; }
+dl.glossary dd { margin: 0 0 0 14px; }
+.alt h4 { margin: 0 0 6px; font: 600 13px system-ui, sans-serif; color: var(--warn); }
+.alt + .alt { margin-top: 0; }
+.loading { color: var(--muted); font-style: italic; }
+footer { margin-top: 40px; font: 13px/1.5 system-ui, sans-serif; color: var(--muted); }
+@media (max-width: 520px) { .verse { grid-template-columns: 1fr; } .verse .n { text-align: left; padding: 0; } .msg, .syls, .alt { grid-column: 1; } }
+@media print { textarea, .bar, details.help, footer { display: none; } body { background: #fff; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Analizzatore metrico</h1>
+    <p>Incolla un verso o una poesia intera</p>
+  </header>
+
+  <textarea id="input" spellcheck="false" placeholder="Nel mezzo del cammin di nostra vita&#10;mi ritrovai per una selva oscura,&#10;ché la diritta via era smarrita."></textarea>
+
+  <div class="bar">
+    <button id="go" class="primary" disabled>Analizza</button>
+    <button id="sample" type="button">Esempio</button>
+    <button id="clear" type="button">Svuota</button>
+    <span class="spacer"></span>
+    <label class="opt">Dieresi/sineresi al massimo
+      <select id="licenses"><option value="0">0 (rigorosa)</option><option value="1">1</option><option value="2" selected>2</option></select>
+    </label>
+  </div>
+  <div id="status" role="status" aria-live="polite">Caricamento del motore di analisi (solo la prima volta, qualche secondo)…</div>
+
+  <details class="help">
+    <summary>Come si usa</summary>
+    <ul>
+      <li>Un verso per riga; una riga vuota separa le strofe. Si può anche premere <b>Ctrl+Invio</b> per analizzare.</li>
+      <li>Il programma indovina l'accento delle parole comuni. Scrivilo tu per gli <b>omografi</b> (àncora / ancòra), le <b>parole straniere</b> (compùter) e per la <b>dieresi</b> (visïone). Un accento scritto ha sempre la precedenza; è/é e ò/ó sono equivalenti.</li>
+      <li>Le sillabe in <b>ictus</b> sono colorate, con l'accento scritto sulla vocale e il segno ▲; i numeri sopra indicano le sedi: la <b style="color:var(--key)">10ª</b> (obbligatoria) e la <b style="color:var(--sub)">4ª e 6ª</b> (a minore e a maiore) sono colorate perché sono quelle da tenere d'occhio. <b>‿</b> è una sinalefe. Il numero di sillabe è quello che vedi nello schema; se il verso è tronco o sdrucciolo compare anche il conteggio metrico (fino all'ultimo ictus più una: un tronco di 10 sillabe vale 11). Il conteggio è mostrato anche per i versi non riconosciuti, con la lettura che più si avvicina a 11.</li>
+      <li>Si sceglie la lettura più naturale: ogni licenza ha un peso (una dialefe dopo vocale tonica pesa meno di una dieresi; la dieresi di «pieno» più di quella di «mio»). Una dieresi insolita è segnalata come «forzata» o «d'eccezione» ma non vietata; con «0 (rigorosa)» dieresi e sineresi sono escluse. Se esistono altre letture con ictus diversi, compare il pulsante «altre letture».</li>
+      <li>Per l'endecasillabo conta solo che l'ultimo ictus cada sulla 10ª sede; a maiore = ictus di 6ª, a minore = ictus di 4ª. Gli <b>ictus</b> indicati sono quelli principali (le sedi cardine: 4ª, 6ª, 10ª e l'ultimo); le altre sillabe toniche sono elencate a parte. Il pulsante <b>Come ho ragionato</b> mostra il ragionamento passo per passo.</li>
+    </ul>
+  </details>
+
+  <details class="help">
+    <summary>Glossario della terminologia metrica</summary>
+    <dl class="glossary">
+<h4>La parola</h4>
+<dt>accento tonico</dt><dd>La maggiore intensità con cui si pronuncia una sillaba della parola: è l&#x27;accento di parola, indipendente dal verso (amóre, càpitano, virtù).</dd>
+<dt>sillaba tonica / atona</dt><dd>Tonica è la sillaba che porta l&#x27;accento tonico; le altre sono atone. Una parola è tronca, piana, sdrucciola, bisdrucciola... secondo che la tonica sia l&#x27;ultima, la penultima, la terzultima, la quartultima...</dd>
+<dt>accento grafico</dt><dd>Il segno scritto sulla vocale (à, è, é, ì, ò, ó, ù). In italiano è obbligatorio sulle parole tronche polisillabe e su alcuni monosillabi (è, più, ciò); qui lo scrivi tu quando serve a togliere un&#x27;ambiguità (àncora / ancòra, compùter) o a segnare la dieresi.</dd>
+<dt>parola atona (clitica)</dt><dd>Parola che si appoggia a quella vicina e non porta ictus da sola: articoli, preposizioni, congiunzioni e pronomi atoni (il, di, e, che, mi, ti, si...).</dd>
+<dt>sillaba grammaticale</dt><dd>La sillaba della parola isolata, secondo le regole di divisione (ca-pi-ta-no).</dd>
+<dt>dittongo, trittongo, iato</dt><dd>Dittongo: due vocali nella stessa sillaba, di cui una è i o u atona (pie-no, quan-do). Trittongo: tre vocali nella stessa sillaba (suoi, miei). Iato: due vocali vicine in sillabe diverse (po-e-ta, pa-ù-ra).</dd>
+<h4>Gli incontri di vocali</h4>
+<dt>sinalefe</dt><dd>La vocale finale di una parola e quella iniziale della successiva formano una sola sillaba metrica (co-me‿il = 2 sillabe invece di 3). È la lettura normale, salvo che la tradizione o il senso impongano la dialefe.</dd>
+<dt>dialefe</dt><dd>Le due vocali restano in sillabe separate: la sillaba in più va contata.</dd>
+<dt>dieresi</dt><dd>Un dittongo si legge come iato (vi-a invece di via); si segna con ï, ë, ö, ü: visïone, avëa.</dd>
+<dt>sineresi</dt><dd>Due vocali in iato si leggono come dittongo (poe-ta invece di po-e-ta).</dd>
+<dt>elisione</dt><dd>Caduta della vocale finale davanti a vocale, segnata con l&#x27;apostrofo (l&#x27;amore, dell&#x27;altra): è un fatto della scrittura, diversa dalla sinalefe, che riguarda solo la lettura del verso.</dd>
+<dt>troncamento e apocope</dt><dd>Caduta di una vocale o di una sillaba finale: cammin, amor, po&#x27;, de&#x27; (= dei). Le parole che restano senza vocale (&#x27;l, &#x27;n) si appoggiano alla parola precedente (e&#x27;l, che&#x27;n).</dd>
+<h4>Il verso</h4>
+<dt>sede</dt><dd>La posizione di una sillaba metrica nel verso: 1ª, 2ª, 3ª... Si contano dopo sinalefi, dieresi e sineresi.</dd>
+<dt>ictus</dt><dd>La sillaba su cui cade l&#x27;accento ritmico del verso. Il programma distingue gli ictus principali, cioè le sedi cardine del metro (per l&#x27;endecasillabo la 10ª, obbligatoria, e la 6ª o la 4ª), dalle altre sillabe toniche che cadono in sedi diverse (per esempio 2ª, 7ª, 8ª). L&#x27;ultimo accento del verso è sempre un ictus.</dd>
+<dt>ictus contigui</dt><dd>Due sillabe toniche in sedi vicine (4ª e 5ª, per esempio): l&#x27;«urto d&#x27;accenti», che rende il ritmo più spezzato.</dd>
+<dt>legge dell&#x27;ultimo accento (conteggio metrico)</dt><dd>Il nome del verso dipende dalla posizione dell&#x27;ultimo ictus: si contano le sillabe fino all&#x27;ultimo ictus e se ne aggiunge una. Un verso tronco di 10 sillabe, un piano di 11 e uno sdrucciolo di 12 contano tutti 11 e sono endecasillabi.</dd>
+<dt>chiusura</dt><dd>Come finisce il verso dopo l&#x27;ultimo ictus: tronca (0 sillabe dopo), piana (1), sdrucciola (2), bisdrucciola (3), trisdrucciola (4), quadrisdrucciola (5), quintisdrucciola (6).</dd>
+<dt>misura</dt><dd>Il nome del verso dal conteggio metrico: quaternario (4), quinario (5), senario (6), settenario (7), ottonario (8), novenario (9), decasillabo (10), endecasillabo (11), dodecasillabo (12).</dd>
+<h4>L&#x27;endecasillabo</h4>
+<dt>endecasillabo</dt><dd>Verso con l&#x27;ultimo ictus in 10ª sede (le sillabe fisiche possono essere 10, 11, 12 o più).</dd>
+<dt>a maiore</dt><dd>Endecasillabo con ictus in 6ª sede (oltre alla 10ª): il verso si divide idealmente in 6+5.</dd>
+<dt>a minore</dt><dd>Endecasillabo con ictus in 4ª sede ma non in 6ª (oltre alla 10ª): si divide idealmente in 4+7.</dd>
+<dt>non canonico</dt><dd>Endecasillabo con ictus in 10ª ma senza ictus né in 4ª né in 6ª.</dd>
+<dt>Criterio adottato</dt><dd>Se la 6ª è tonica il verso è «a maiore», anche quando lo è pure la 4ª; se la 6ª non è tonica ma lo è la 4ª è «a minore». Alcuni manuali trattano a parte i versi con la 4ª e la 6ª insieme: il programma lo segnala nella spiegazione. Le sillabe toniche in altre sedi sono indicate come «altre sillabe toniche», senza giudizio.</dd>
+</dl>
+  </details>
+
+  <section id="summary" hidden></section>
+  <section id="results" aria-live="polite"></section>
+  <div class="bar" id="after" hidden><button id="copy" type="button">Copia lo schema come testo</button></div>
+
+  <footer>Tutta l'analisi avviene nel tuo browser: i testi non vengono inviati a nessun server.</footer>
+</main>
+
+<script>
+"use strict";
+const PYODIDE_SRC = "https://cdn.jsdelivr.net/npm/pyodide@314.0.7/pyodide.js";
+const SAMPLE = [
+  "Nel mezzo del cammin di nostra vita",
+  "mi ritrovai per una selva oscura,",
+  "ché la diritta via era smarrita.",
+  "",
+  "Ahi quanto a dir qual era è cosa dura",
+  "esta selva selvaggia e aspra e forte",
+  "che nel pensier rinova la paura!",
+].join("\n");
+
+const $ = (id) => document.getElementById(id);
+let pyodide = null, analyze = null, lastPlain = "", places = {};
+
+function h(tag, attrs = {}, ...children) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") el.className = v; else if (k === "text") el.textContent = v; else el.setAttribute(k, v);
+  }
+  for (const c of children) if (c != null) el.append(c);
+  return el;
+}
+
+function grid(cells) {
+  const g = h("div", { class: "grid" });
+  cells.forEach((cell, i) => {
+    g.append(h("div", { class: "col" + (cell.stressed ? " st" : "") },
+      h("span", { class: "sede " + (places[i + 1] || ""), text: String(i + 1) }),
+      h("span", { class: "syl", text: cell.text }),
+      h("span", { class: "mark", text: cell.stressed ? "▲" : "" })));
+  });
+  return g;
+}
+
+function countText(v) {
+  const base = v.syllables === 1 ? "1 sillaba" : `${v.syllables} sillabe`;
+  return v.length === v.syllables ? base : `${base} (${v.length} per la metrica)`;
+}
+
+function stressText(v) {
+  const ord = (list) => list.map((p) => p + "ª").join(" ");
+  return "ictus " + ord(v.ictus) + (v.toniche.length ? " · altre toniche " + ord(v.toniche) : "");
+}
+
+function metaRow(v) {
+  const kind = v.kind ? ` ${v.kind}` : "";
+  const row = h("div", { class: "meta" },
+    h("span", { class: "chip good", text: `✔ endecasillabo${kind} · ${v.ending}` }),
+    h("span", { class: "chip", text: countText(v) }),
+    h("span", { class: "chip", text: stressText(v) }));
+  v.notes.forEach((n) => row.append(h("span", { class: "chip", text: n })));
+  return row;
+}
+
+function stepsPanel(v) {
+  const panel = h("div", { class: "steps", hidden: "" });
+  panel.hidden = true;
+  panel.append(h("h4", { text: "Come ho ragionato" }));
+  const list = h("ol");
+  v.steps.forEach((step) => {
+    const inner = h("ul");
+    step.lines.forEach((line) => inner.append(h("li", { text: line })));
+    list.append(h("li", {}, h("b", { text: step.title }), inner));
+  });
+  panel.append(list);
+  return panel;
+}
+
+function addStepsButton(v, box, row) {
+  if (!v.steps || !v.steps.length) return;
+  const panel = stepsPanel(v);
+  const btn = h("button", { class: "chip didactic", type: "button", "aria-expanded": "false", text: "Come ho ragionato" });
+  btn.addEventListener("click", () => {
+    const open = btn.getAttribute("aria-expanded") === "true";
+    btn.setAttribute("aria-expanded", String(!open));
+    panel.hidden = open;
+  });
+  row.append(btn);
+  box.append(panel);
+}
+
+function renderVerse(v) {
+  if (v.break) return h("div", { class: "stanza" });
+  const box = h("article", { class: "verse" }, h("div", { class: "n", text: String(v.number) }));
+  const body = h("div");
+  box.append(body);
+  if (v.error) {
+    body.append(h("div", { class: "meta" }, h("span", { class: "chip warn", text: "⚠ riga non analizzabile" })));
+    box.append(h("div", { class: "msg", text: v.error }), h("div", { class: "syls", text: v.text }));
+  } else if (v.ok) {
+    body.append(grid(v.cells), metaRow(v));
+    addStepsButton(v, box, body.querySelector(".meta"));
+    if (v.alternatives.length) {
+      const panel = [];
+      const btn = h("button", { class: "chip", type: "button", "aria-expanded": "false",
+        text: `${v.alternatives.length} altre letture` });
+      btn.addEventListener("click", () => {
+        const open = btn.getAttribute("aria-expanded") === "true";
+        btn.setAttribute("aria-expanded", String(!open));
+        panel.forEach((p) => { p.hidden = open; });
+      });
+      body.querySelector(".meta").append(btn);
+      v.alternatives.forEach((alt, i) => {
+        const a = h("div", { class: "alt", hidden: "" },
+          h("h4", { text: `Lettura ${i + 2}` }), grid(alt.cells), metaRow(alt));
+        a.hidden = true;
+        panel.push(a);
+        box.append(a);
+      });
+    }
+  } else {
+    const a = v.attempt;
+    if (a) body.append(grid(a.cells));
+    const row = h("div", { class: "meta" }, h("span", { class: "chip bad", text: "✘ non riconosciuto" }));
+    if (a) {
+      row.append(h("span", { class: "chip", text: countText(a) }),
+        h("span", { class: "chip", text: stressText(a) }));
+      a.notes.forEach((n) => row.append(h("span", { class: "chip", text: n })));
+    }
+    body.append(row);
+    addStepsButton(v, box, row);
+    if (!a) box.append(h("div", { class: "syls", text: v.words.join(" | ") }));
+    box.append(h("div", { class: "msg", text: v.failure || "" }));
+    (v.suggestions || []).forEach((t) => box.append(h("div", { class: "msg", text: "💡 Prova: " + t })));
+  }
+  return box;
+}
+
+function show(data) {
+  places = data.places || {};
+  const results = $("results");
+  results.replaceChildren(...data.verses.map(renderVerse));
+  $("summary").hidden = !data.summary;
+  $("summary").textContent = data.summary;
+  lastPlain = data.plain;
+  $("after").hidden = data.verses.length === 0;
+}
+
+async function run() {
+  const text = $("input").value;
+  if (!text.trim() || !analyze) return;
+  $("go").disabled = true;
+  $("status").textContent = "Analisi in corso…";
+  await new Promise((r) => setTimeout(r, 30));          // lascia ridisegnare la pagina
+  try {
+    const data = JSON.parse(analyze(text, Number($("licenses").value)));
+    show(data);
+    $("status").textContent = "";
+  } catch (error) {
+    $("status").textContent = "Errore: " + error;
+  } finally {
+    $("go").disabled = false;
+  }
+}
+
+async function boot() {
+  try {
+    await new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = PYODIDE_SRC; s.onload = resolve; s.onerror = () => reject(new Error("impossibile caricare Pyodide"));
+      document.head.append(s);
+    });
+    pyodide = await loadPyodide();
+    const archive = await (await fetch("app.zip")).arrayBuffer();
+    pyodide.unpackArchive(archive, "zip", { extractDir: "/app" });
+    pyodide.runPython(`
+import sys, json
+sys.path.insert(0, "/app")
+from metrica.web import analyze_for_web
+def _analyze(text, licenses):
+    return json.dumps(analyze_for_web(text, licenses), ensure_ascii=False)
+`);
+    analyze = pyodide.globals.get("_analyze");
+    $("go").disabled = false;
+    $("status").textContent = "";
+    document.body.dataset.ready = "1";
+  } catch (error) {
+    $("status").textContent = "Non riesco ad avviare il motore: " + error.message +
+      ". Serve una connessione per caricare Pyodide e un server web (non il doppio clic sul file).";
+  }
+}
+
+$("go").addEventListener("click", run);
+$("input").addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") run(); });
+$("sample").addEventListener("click", () => { $("input").value = SAMPLE; run(); });
+$("clear").addEventListener("click", () => { $("input").value = ""; $("results").replaceChildren(); $("summary").hidden = true; $("after").hidden = true; $("input").focus(); });
+$("copy").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(lastPlain); $("status").textContent = "Schema copiato."; }
+  catch { $("status").textContent = "Copia non riuscita: seleziona il testo a mano."; }
+});
+boot();
+</script>
+</body>
+</html>
