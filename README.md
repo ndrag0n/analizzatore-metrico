@@ -9,7 +9,7 @@ riconosce sinalefe, dialefe, dieresi e sineresi e classifica l'endecasillabo
 Serve anche come aiuto alla scrittura di sonetti: i versi non riconosciuti
 ricevono suggerimenti (iati, accenti alternativi).
 
-**Prova online:** https://TUONOME.github.io/analizzatore-metrico/
+**Prova online:** https://ndrag0n.github.io/analizzatore-metrico/
 
 ## Uso
 Incolla un verso o una poesia intera e premi *Analizza*. L'analisi avviene
